@@ -1,0 +1,135 @@
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "postgresql"
+  url      = env("DATABASE_URL")
+}
+
+enum Role {
+  CANDIDATE
+  RECRUITER
+}
+
+enum JobStatus {
+  OPEN
+  CLOSED
+}
+
+enum SkillSource {
+  PARSED
+  MANUAL
+}
+
+enum ApplicationStatus {
+  APPLIED
+  REVIEWING
+  SHORTLISTED
+  INTERVIEWING
+  REJECTED
+  OFFERED
+}
+
+model User {
+  id           String           @id @default(uuid())
+  email        String           @unique
+  passwordHash String
+  role         Role
+  createdAt    DateTime         @default(now())
+
+  // Relations
+  jobs            Job[]
+  resumes         Resume[]
+  candidateSkills CandidateSkill[]
+  applications    Application[]
+  authoredEvents  ApplicationEvent[]
+
+  @@map("users")
+}
+
+model Job {
+  id          String      @id @default(uuid())
+  title       String
+  description String
+  location    String
+  status      JobStatus   @default(OPEN)
+  recruiterId String
+  createdAt   DateTime    @default(now())
+
+  // Relations
+  recruiter    User          @relation(fields: [recruiterId], references: [id], onDelete: Cascade)
+  skills       JobSkill[]
+  applications Application[]
+
+  @@map("jobs")
+}
+
+model JobSkill {
+  id       String  @id @default(uuid())
+  jobId    String
+  skill    String
+  required Boolean @default(true)
+
+  // Relations
+  job Job @relation(fields: [jobId], references: [id], onDelete: Cascade)
+
+  @@map("job_skills")
+}
+
+model Resume {
+  id          String   @id @default(uuid())
+  candidateId String
+  fileUrl     String
+  rawText     String?
+  createdAt   DateTime @default(now())
+
+  // Relations
+  candidate User @relation(fields: [candidateId], references: [id], onDelete: Cascade)
+
+  @@map("resumes")
+}
+
+model CandidateSkill {
+  id          String      @id @default(uuid())
+  candidateId String
+  skill       String
+  source      SkillSource @default(PARSED)
+
+  // Relations
+  candidate User @relation(fields: [candidateId], references: [id], onDelete: Cascade)
+
+  @@map("candidate_skills")
+}
+
+model Application {
+  id          String            @id @default(uuid())
+  jobId       String
+  candidateId String
+  matchScore  Int               @default(0)
+  status      ApplicationStatus @default(APPLIED)
+  createdAt   DateTime          @default(now())
+
+  // Relations
+  job       Job                @relation(fields: [jobId], references: [id], onDelete: Cascade)
+  candidate User               @relation(fields: [candidateId], references: [id], onDelete: Cascade)
+  events    ApplicationEvent[]
+
+  @@unique([jobId, candidateId])
+  @@map("applications")
+}
+
+model ApplicationEvent {
+  id            String            @id @default(uuid())
+  applicationId String
+  fromStatus    ApplicationStatus
+  toStatus      ApplicationStatus
+  actorId       String
+  createdAt     DateTime          @default(now())
+
+  // Relations
+  application Application @relation(fields: [applicationId], references: [id], onDelete: Cascade)
+  actor       User        @relation(fields: [actorId], references: [id], onDelete: Cascade)
+
+  @@map("application_events")
+}
